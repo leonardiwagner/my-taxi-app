@@ -17,6 +17,15 @@ those values.
 - `GET /health` reports that the process is responding.
 - `GET /ready` reports that the service is ready to receive traffic.
 - `GET /metrics` exposes Prometheus process and HTTP request metrics.
+- `POST /rides` accepts a ride request and returns `202 Accepted`. Its JSON body is:
+
+  ```json
+  {
+    "customer": { "id": "customer-123" },
+    "startingPoint": "Central Station",
+    "destination": "Airport"
+  }
+  ```
 
 ## Observability
 
