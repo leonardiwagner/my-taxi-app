@@ -1,21 +1,35 @@
-import { buildApp } from './app.js';
+import { Kafka, logLevel } from 'kafkajs';
 import { shutdownTelemetry } from './instrumentation.js';
+import { startRideGenerator } from './ride-generator.js';
+import { createRideRequestPublisher } from './ride-request-publisher.js';
 
-const app = buildApp();
-const port = Number(process.env.PORT ?? 3000);
-const host = process.env.HOST ?? '0.0.0.0';
+const brokers = (process.env.KAFKA_BROKERS ?? 'localhost:9092').split(',');
+const topic = process.env.KAFKA_RIDE_TOPIC ?? 'rides';
+const kafka = new Kafka({ clientId: 'app-ride', brokers, logLevel: logLevel.NOTHING });
+const producer = kafka.producer();
 
 try {
-  await app.listen({ port, host });
+  console.info('Connecting to Kafka', { brokers });
+  await producer.connect();
+  console.info('Connected to Kafka', { brokers, topic });
 } catch (error) {
-  app.log.error(error);
+  console.error('Unable to connect to Kafka', { brokers, error });
+  await shutdownTelemetry();
   process.exitCode = 1;
+  process.exit();
 }
+
+const generator = startRideGenerator(createRideRequestPublisher(producer, topic), {
+  onError: (error) => console.error('Unable to publish ride request', { error }),
+});
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.once(signal, async () => {
-    await app.close();
+    console.info('Stopping ride generator', { signal });
+    await generator.stop();
+    await producer.disconnect();
+    console.info('Disconnected from Kafka');
     await shutdownTelemetry();
-    process.exit(0);
+    process.exit();
   });
 }

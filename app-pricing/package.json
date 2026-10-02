@@ -1,8 +1,7 @@
 {
-  "name": "app-ride",
+  "name": "app-pricing",
   "version": "0.1.0",
   "private": true,
-  "description": "Kafka ride request generator",
   "type": "module",
   "scripts": {
     "clean": "rm -rf dist coverage",
