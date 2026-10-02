@@ -1,6 +1,6 @@
 # app-ride
 
-Fastify HTTP API scaffold for the ride service.
+Generates a ride request every second and publishes it to Kafka.
 
 ## Run locally
 
@@ -9,37 +9,20 @@ npm install
 npm run dev
 ```
 
-The API listens on `0.0.0.0:3000` by default. Set `HOST` or `PORT` to override
-those values.
+The generator connects to `localhost:9092` by default and writes to the `rides`
+topic. Configure these values with `KAFKA_BROKERS` (a comma-separated list) and
+`KAFKA_RIDE_TOPIC`.
 
-## Endpoints
+Each message is JSON with a unique ride and customer identifier, a start and
+destination from a small list of city routes, and an ISO-8601 request timestamp.
 
-- `GET /health` reports that the process is responding.
-- `GET /ready` reports that the service is ready to receive traffic.
-- `GET /metrics` exposes Prometheus process and HTTP request metrics.
-- `POST /rides` accepts a ride request and returns `202 Accepted`. Its JSON body is:
-
-  ```json
-  {
-    "customer": { "id": "customer-123" },
-    "startingPoint": "Central Station",
-    "destination": "Airport"
-  }
-  ```
-
-## Observability
-
-Fastify's Pino logger writes structured logs. OpenTelemetry auto-instrumentation
-collects traces and exports them over OTLP/HTTP to `http://localhost:4318` by
-default. Set `OTEL_EXPORTER_OTLP_ENDPOINT` to use another collector endpoint.
-
-Prometheus can scrape `/metrics`. The HTTP metrics use route templates to keep
-label cardinality bounded.
+OpenTelemetry auto-instrumentation exports traces over OTLP/HTTP to
+`http://localhost:4318` by default. Set `OTEL_EXPORTER_OTLP_ENDPOINT` to use
+another collector endpoint.
 
 ## Checks
 
 ```sh
-npm test
 npm run build
 npm run lint
 npm run format:check
