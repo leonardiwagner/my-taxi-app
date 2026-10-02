@@ -1,6 +1,6 @@
 import { Kafka, logLevel } from 'kafkajs';
 import { shutdownTelemetry } from './instrumentation.js';
-import { RideOrchestrator } from './orchestrator.js';
+import { RideOrchestrator } from './domain/orchestrator.js';
 
 const brokers = (process.env.KAFKA_BROKERS ?? 'localhost:9092')
   .split(',')
