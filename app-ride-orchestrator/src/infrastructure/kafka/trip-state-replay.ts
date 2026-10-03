@@ -66,9 +66,16 @@ export function createTripStateReplay(
       await replay.run({
         autoCommit: false,
         partitionsConsumedConcurrently: 1,
-        eachMessage: async ({ partition, message }) => {
-          restoreFromMessage(message, store);
-          progress.markPartitionReached(partition, BigInt(message.offset) + 1n);
+        eachBatch: async ({ batch, resolveOffset, heartbeat }) => {
+          for (const message of batch.messages) {
+            restoreFromMessage(message, store);
+            resolveOffset(message.offset);
+          }
+          await heartbeat();
+          progress.markPartitionReached(
+            batch.partition,
+            BigInt(batch.highWatermark),
+          );
         },
       });
       await waitForReplay(
