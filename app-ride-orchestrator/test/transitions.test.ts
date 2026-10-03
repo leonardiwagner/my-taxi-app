@@ -1,7 +1,9 @@
 import {
   applyOutcome,
+  isRetentionElapsed,
+  isTimedOut,
   timeoutTrip,
-} from '../src/domain/trip-state/transitions.js';
+} from '../src/domain/transitions.js';
 
 const now = new Date('2026-10-02T12:00:00.000Z');
 const driver = {
@@ -91,5 +93,67 @@ describe('timeoutTrip', () => {
       type: 'ride.rejected',
       reason: { source: 'timeout', code: 'TIMEOUT' },
     });
+  });
+
+  it('leaves a ride that already reached a final state untouched', () => {
+    const confirmed = applyOutcome(
+      applyOutcome(undefined, { kind: 'driver', outcome: driver }, now).state,
+      { kind: 'pricing', outcome: pricing },
+      now,
+    ).state;
+    const expired = timeoutTrip(confirmed, new Date(now.getTime() + 600_000));
+    expect(expired.changed).toBe(false);
+    expect(expired.state).toBe(confirmed);
+  });
+});
+
+describe('isTimedOut', () => {
+  const pending = applyOutcome(
+    undefined,
+    { kind: 'driver', outcome: driver },
+    now,
+  ).state;
+
+  it('is true only once the deadline is reached', () => {
+    expect(isTimedOut(pending, new Date(now.getTime() + 59_999), 60_000)).toBe(
+      false,
+    );
+    expect(isTimedOut(pending, new Date(now.getTime() + 60_000), 60_000)).toBe(
+      true,
+    );
+  });
+
+  it('is false for a ride that is no longer pending', () => {
+    const rejected = timeoutTrip(pending, now).state;
+    expect(isTimedOut(rejected, new Date(now.getTime() + 600_000), 0)).toBe(
+      false,
+    );
+  });
+});
+
+describe('isRetentionElapsed', () => {
+  const rejected = timeoutTrip(
+    applyOutcome(undefined, { kind: 'driver', outcome: driver }, now).state,
+    now,
+  ).state;
+
+  it('is true only once the retention period has passed', () => {
+    expect(
+      isRetentionElapsed(rejected, new Date(now.getTime() + 9_999), 10_000),
+    ).toBe(false);
+    expect(
+      isRetentionElapsed(rejected, new Date(now.getTime() + 10_000), 10_000),
+    ).toBe(true);
+  });
+
+  it('is false for a pending ride, which has no final timestamp', () => {
+    const pending = applyOutcome(
+      undefined,
+      { kind: 'driver', outcome: driver },
+      now,
+    ).state;
+    expect(
+      isRetentionElapsed(pending, new Date(now.getTime() + 600_000), 0),
+    ).toBe(false);
   });
 });

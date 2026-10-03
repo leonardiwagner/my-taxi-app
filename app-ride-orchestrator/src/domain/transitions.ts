@@ -1,8 +1,12 @@
-import type {
-  OutcomeInput,
-  TripState,
-  Transition,
-} from './model.js';
+import type { OutcomeInput } from './outcomes.js';
+import type { RideEvent } from './ride-events.js';
+import type { TripState } from './trip.js';
+
+export interface Transition {
+  state: TripState;
+  event?: RideEvent;
+  changed: boolean;
+}
 
 export function applyOutcome(
   current: TripState | undefined,
@@ -97,4 +101,27 @@ export function timeoutTrip(current: TripState, now: Date): Transition {
       reason,
     },
   };
+}
+
+export function isTimedOut(
+  state: TripState,
+  now: Date,
+  timeoutMs: number,
+): boolean {
+  return (
+    state.status === 'PENDING' &&
+    now.getTime() - Date.parse(state.startedAt) >= timeoutMs
+  );
+}
+
+export function isRetentionElapsed(
+  state: TripState,
+  now: Date,
+  retentionMs: number,
+): boolean {
+  return (
+    state.status !== 'PENDING' &&
+    state.finalAt !== undefined &&
+    now.getTime() - Date.parse(state.finalAt) >= retentionMs
+  );
 }

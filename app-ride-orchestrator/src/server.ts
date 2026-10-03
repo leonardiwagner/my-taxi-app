@@ -1,75 +1,38 @@
-import { Kafka, logLevel } from 'kafkajs';
+import { RideOrchestrator } from './application/ride-orchestrator.js';
+import { loadConfig } from './config.js';
+import { createKafkaClients } from './infrastructure/kafka/clients.js';
+import { KafkaOutcomeSource } from './infrastructure/kafka/outcome-consumer.js';
+import { TransactionalTripWriter } from './infrastructure/kafka/transactional-trip-writer.js';
+import { createTripStateReplay } from './infrastructure/kafka/trip-state-replay.js';
 import { shutdownTelemetry } from './instrumentation.js';
-import { RideOrchestrator } from './domain/orchestration/orchestrator.js';
 
-const brokers = (process.env.KAFKA_BROKERS ?? 'localhost:9092')
-  .split(',')
-  .map((broker) => broker.trim())
-  .filter(Boolean);
-const consumerGroup =
-  process.env.KAFKA_CONSUMER_GROUP ?? 'app-ride-orchestrator';
-const driverTopic =
-  process.env.KAFKA_DRIVER_RESULTS_TOPIC ?? 'driver-matching-results';
-const pricingTopic =
-  process.env.KAFKA_PRICING_RESULTS_TOPIC ?? 'pricing-results';
-const stateTopic = process.env.KAFKA_TRIP_STATE_TOPIC ?? 'trip.state';
-const confirmedTopic =
-  process.env.KAFKA_RIDE_CONFIRMED_TOPIC ?? 'ride.confirmed';
-const rejectedTopic = process.env.KAFKA_RIDE_REJECTED_TOPIC ?? 'ride.rejected';
-const timeoutMs = 60_000;
-const finalRetentionMs = Number.parseInt(
-  process.env.TRIP_FINAL_RETENTION_MS ?? `${24 * 60 * 60 * 1_000}`,
-  10,
-);
-
-if (
-  brokers.length === 0 ||
-  !Number.isSafeInteger(finalRetentionMs) ||
-  finalRetentionMs < 0
-) {
-  throw new Error(
-    'Kafka brokers and a non-negative final retention period are required.',
-  );
-}
-
-const kafka = new Kafka({
-  clientId: 'app-ride-orchestrator',
-  brokers,
-  logLevel: logLevel.NOTHING,
-});
-const consumer = kafka.consumer({
-  groupId: consumerGroup,
-  allowAutoTopicCreation: false,
-});
-const producer = kafka.producer({
-  transactionalId: `${consumerGroup}-transactional`,
-  allowAutoTopicCreation: false,
-});
-const orchestrator = new RideOrchestrator(kafka, consumer, producer, {
-  driverTopic,
-  pricingTopic,
-  stateTopic,
-  confirmedTopic,
-  rejectedTopic,
-  consumerGroup,
-  timeoutMs,
-  finalRetentionMs,
+const config = loadConfig();
+const { kafka, consumer, producer } = createKafkaClients(config);
+const orchestrator = new RideOrchestrator({
+  source: new KafkaOutcomeSource(
+    consumer,
+    config.topics,
+    config.timing.heartbeatIntervalMs,
+  ),
+  writer: new TransactionalTripWriter(
+    producer,
+    config.topics,
+    config.consumerGroup,
+  ),
+  restoreState: createTripStateReplay(kafka, config, console),
+  timing: config.timing,
 });
 
 try {
   console.info('Starting ride orchestrator', {
-    brokers,
-    consumerGroup,
-    driverTopic,
-    pricingTopic,
-    stateTopic,
-    confirmedTopic,
-    rejectedTopic,
+    brokers: config.brokers,
+    consumerGroup: config.consumerGroup,
+    ...config.topics,
   });
   await orchestrator.start();
   console.info('Ride orchestrator is consuming results', {
-    driverTopic,
-    pricingTopic,
+    driverTopic: config.topics.driver,
+    pricingTopic: config.topics.pricing,
   });
 } catch (error) {
   console.error('Unable to start ride orchestrator', { error });
