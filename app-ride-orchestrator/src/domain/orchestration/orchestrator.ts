@@ -1,5 +1,5 @@
 import type { Consumer, Kafka, Producer } from 'kafkajs';
-import type { TripState } from '../trip-state.js';
+import type { TripState } from '../trip-state/model.js';
 import { handleResult } from './result-handler.js';
 import type { OrchestratorOptions } from './orchestrator-options.js';
 import { SerialQueue } from './serial-queue.js';

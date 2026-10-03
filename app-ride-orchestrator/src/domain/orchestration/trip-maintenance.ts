@@ -1,4 +1,5 @@
-import { timeoutTrip, type TripState } from '../trip-state.js';
+import { timeoutTrip } from '../trip-state/transitions.js';
+import type { TripState } from '../trip-state/model.js';
 import type { OrchestratorOptions } from './orchestrator-options.js';
 import { TripStateWriter } from './trip-state-writer.js';
 

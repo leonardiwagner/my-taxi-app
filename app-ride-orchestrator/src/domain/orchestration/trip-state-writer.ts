@@ -1,5 +1,9 @@
 import type { EachMessagePayload, Producer, Transaction } from 'kafkajs';
-import type { RideEvent, TripState, Transition } from '../trip-state.js';
+import type {
+  RideEvent,
+  TripState,
+  Transition,
+} from '../trip-state/model.js';
 import type { OrchestratorOptions } from './orchestrator-options.js';
 
 export class TripStateWriter {

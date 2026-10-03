@@ -1,11 +1,11 @@
 import type { EachMessagePayload } from 'kafkajs';
-import {
-  applyOutcome,
-  parseOutcome,
-  type OutcomeKind,
-  type TripOutcome,
-  type TripState,
-} from '../trip-state.js';
+import { applyOutcome } from '../trip-state/transitions.js';
+import type {
+  OutcomeInput,
+  OutcomeKind,
+  TripState,
+} from '../trip-state/model.js';
+import { parseOutcome } from '../../infrastructure/serialization/trip-state-parser.js';
 import type { OrchestratorOptions } from './orchestrator-options.js';
 import { TripStateWriter } from './trip-state-writer.js';
 
@@ -19,9 +19,9 @@ export async function handleResult(
 ): Promise<void> {
   const kind = kindForTopic(payload.topic, options);
   const rideIdKey = payload.message.key?.toString();
-  let outcome: TripOutcome;
+  let input: OutcomeInput;
   try {
-    outcome = parseOutcome(payload.message.value?.toString() ?? '', kind);
+    input = parseOutcome(payload.message.value?.toString() ?? '', kind);
   } catch (error) {
     logger.error('Skipping invalid result record', {
       topic: payload.topic,
@@ -32,29 +32,28 @@ export async function handleResult(
     await writer.commitInputOffset(payload);
     return;
   }
-  if (!rideIdKey || rideIdKey !== outcome.rideId) {
+  if (!rideIdKey || rideIdKey !== input.outcome.rideId) {
     logger.error('Skipping result whose key does not match rideId', {
       topic: payload.topic,
       partition: payload.partition,
       offset: payload.message.offset,
       rideIdKey,
-      rideId: outcome.rideId,
+      rideId: input.outcome.rideId,
     });
     await writer.commitInputOffset(payload);
     return;
   }
 
   const transition = applyOutcome(
-    trips.get(outcome.rideId),
-    kind,
-    outcome,
+    trips.get(input.outcome.rideId),
+    input,
     now(),
   );
   await writer.commitOutcome(payload, transition);
-  if (transition.changed) trips.set(outcome.rideId, transition.state);
+  if (transition.changed) trips.set(input.outcome.rideId, transition.state);
   if (transition.event)
     logger.info('Trip reached final state', {
-      rideId: outcome.rideId,
+      rideId: input.outcome.rideId,
       status: transition.state.status,
     });
 }
