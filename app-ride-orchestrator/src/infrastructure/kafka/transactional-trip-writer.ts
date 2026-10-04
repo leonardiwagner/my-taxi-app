@@ -67,11 +67,15 @@ export class TransactionalTripWriter implements TripWriter {
     work: (transaction: Transaction) => Promise<unknown>,
   ): Promise<void> {
     const transaction = await this.producer.transaction();
+    let committing = false;
     try {
       await work(transaction);
+      committing = true;
       await transaction.commit();
     } catch (error) {
-      await transaction.abort();
+      // kafkajs only allows abort from TRANSACTING; once commit has started, a failure
+      // leaves the producer in COMMITTING and abort would mask the original error.
+      if (!committing) await transaction.abort();
       throw error;
     }
   }
