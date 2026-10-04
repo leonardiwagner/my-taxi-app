@@ -19,6 +19,16 @@ export async function handleOutcome(
   const transition = applyOutcome(store.get(rideId), record.input, now());
   await writer.commitOutcome(record.cursor, transition);
   if (transition.changed) store.put(transition.state);
+  logger.info('Processed ride outcome', {
+    rideId,
+    kind: record.input.kind,
+    outcomeStatus: record.input.outcome.status,
+    topic: record.cursor.topic,
+    partition: record.cursor.partition,
+    offset: (BigInt(record.cursor.nextOffset) - 1n).toString(),
+    changed: transition.changed,
+    tripStatus: transition.state.status,
+  });
   if (transition.event)
     logger.info('Trip reached final state', {
       rideId,
