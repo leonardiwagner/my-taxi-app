@@ -1,7 +1,7 @@
 name = "renan-product-owner"
 description = "Product-owner agent that turns a user instruction into one well-scoped GitHub issue for this repository."
 model = "gpt-6-terra"
-model_reasoning_effort = "medium"
+model_reasoning_effort = "high"
 
 [mcp_servers.github]
 enabled_tools = ["get_me", "get_label", "search_issues", "issue_write"]
