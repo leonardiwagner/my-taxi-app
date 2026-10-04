@@ -1,5 +1,6 @@
 import type { TripState } from '../domain/trip.js';
 import { SerialQueue } from '../shared/serial-queue.js';
+import { createTraceAwareLogger } from '../trace-context.js';
 import { expirePendingTrips } from './expire-pending-trips.js';
 import { handleOutcome } from './handle-outcome.js';
 import type {
@@ -39,7 +40,7 @@ export class RideOrchestrator {
     this.restoreState = dependencies.restoreState;
     this.timing = dependencies.timing;
     this.now = dependencies.now ?? (() => new Date());
-    this.logger = dependencies.logger ?? console;
+    this.logger = createTraceAwareLogger(dependencies.logger ?? console);
   }
 
   async start(): Promise<void> {

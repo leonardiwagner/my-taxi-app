@@ -59,14 +59,16 @@ state machine.
 
 ## Quick start
 
-### 1. Start Kafka
+### 1. Start the local infrastructure
 
 ```sh
 docker compose up -d
 ```
 
-This brings up a single-broker KRaft Kafka on `localhost:9092` and Kafka UI on
-<http://localhost:8080>.
+This starts single-broker KRaft Kafka on `localhost:9092`, Kafka UI on
+<http://localhost:8080>, Tempo on OTLP ports `4317`/`4318`, and Grafana on
+<http://localhost:3000>. Grafana's local login is `admin` / `admin`. Tempo stores
+traces in the `tempo-data` Compose volume and retains them for 24 hours.
 
 ### 2. Create the topics
 
@@ -116,11 +118,24 @@ freely — it replays `trip.state` before consuming results), and run only **one
 orchestrator instance: its trip state is in memory and coordinated through a
 single consumer group.
 
-No collector is needed for traces, but the exporter will log connection errors
-if nothing listens on the OTLP endpoint. Set `OTEL_SDK_DISABLED=true` to silence
-telemetry entirely.
+### 4. Find a ride trace
 
-### 4. Watch it work
+Services export traces to local Tempo at `http://localhost:4318` by default.
+Each Kafka publish injects W3C `traceparent` headers and each consumer extracts
+them, so the spans for a ride share its trace ID. The `rideId` span attribute is
+also indexed for TraceQL search.
+
+Ride processing logs include `trace_id` alongside `rideId`. Copy it from a log
+into Grafana's Tempo trace ID search to open the trace.
+
+Open the provisioned **Ride pipeline / Ride trace lookup** dashboard in Grafana
+and enter a trace ID in the **Trace ID** field. The trace view lists service
+spans with their processing steps and durations.
+
+Set `OTEL_EXPORTER_OTLP_ENDPOINT` to another OTLP/HTTP base URL (without the
+`/v1/traces` suffix) to export elsewhere.
+
+### 5. Watch it work
 
 Tail the final events, or browse the topics in Kafka UI:
 

@@ -3,6 +3,7 @@ import type { InboundRecord, OutcomeSource } from '../../application/ports.js';
 import { decodeOutcomeRecord } from './inbound-record.js';
 import { StartupGate } from './startup-gate.js';
 import type { TopicMap } from './topics.js';
+import { setRideId, withConsumerSpan } from '../../trace-context.js';
 
 export class KafkaOutcomeSource implements OutcomeSource {
   private readonly gate: StartupGate;
@@ -28,8 +29,17 @@ export class KafkaOutcomeSource implements OutcomeSource {
       autoCommit: false,
       partitionsConsumedConcurrently: 1,
       eachMessage: async (payload) => {
-        await this.gate.wait(() => payload.heartbeat());
-        await consume(decodeOutcomeRecord(payload, this.topics));
+        await withConsumerSpan(
+          payload,
+          'app-ride-orchestrator',
+          'join-ride-outcome',
+          async (span) => {
+            await this.gate.wait(() => payload.heartbeat());
+            const record = decodeOutcomeRecord(payload, this.topics);
+            if (record.ok) setRideId(span, record.input.outcome.rideId);
+            await consume(record);
+          },
+        );
       },
     });
   }

@@ -13,9 +13,13 @@ Consumes ride requests from Kafka, waits 1–3 seconds, and publishes a mock pri
 | `KAFKA_PRICING_DEAD_LETTER_TOPIC` | `pricing-dead-letter` | Topic for rides that fail processing or result publication |
 | `PRICING_MAX_RETRIES` | `3` | Retries after the initial attempt |
 | `PRICING_RETRY_BACKOFF_MS` | `250` | Base linear retry delay in milliseconds |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | unset | Optional OpenTelemetry collector base URL |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://localhost:4318` | OTLP/HTTP collector base URL; `/v1/traces` is appended |
 
 Create the input, results, and dead-letter topics before starting the service. For each input ride, the result is keyed by ride ID and has one of these shapes:
+
+The service extracts W3C trace context from Kafka headers, records a `price-ride`
+span with the `rideId` and input topic, and injects the context into result and
+dead-letter records.
 
 ```json
 {"status":"success","rideId":"ride-123","price":{"amount":42.5,"currency":"EUR"},"pricedAt":"2026-10-02T12:00:00.000Z"}
