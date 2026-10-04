@@ -13,9 +13,13 @@ Consumes ride requests from Kafka, waits a randomly selected 5–10 seconds, and
 | `KAFKA_MATCHING_DEAD_LETTER_TOPIC` | `driver-matching-dead-letter` | Topic for rides that fail processing or result publication |
 | `MATCHING_MAX_RETRIES` | `3` | Retries after the initial attempt |
 | `MATCHING_RETRY_BACKOFF_MS` | `250` | Base linear retry delay in milliseconds |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | unset | Optional OpenTelemetry collector base URL |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://localhost:4318` | OTLP/HTTP collector base URL; `/v1/traces` is appended |
 
 Create the input, results, and dead-letter topics before starting the service. Outcome messages are keyed by ride ID and use one of these shapes:
+
+The service extracts W3C trace context from Kafka headers, records a
+`match-driver` span with the `rideId` and input topic, and injects the context
+into result and dead-letter records.
 
 ```json
 {"status":"success","rideId":"ride-123","driver":{"id":"driver-001","name":"Alex Morgan"},"matchedAt":"2026-10-02T12:00:00.000Z"}

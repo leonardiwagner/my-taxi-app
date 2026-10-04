@@ -2,10 +2,12 @@ import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentation
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { NodeSDK } from '@opentelemetry/sdk-node';
 
-const endpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
 const sdk = new NodeSDK({
+  serviceName: 'app-pricing',
+  traceExporter: new OTLPTraceExporter({
+    url: `${process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? 'http://localhost:4318'}/v1/traces`,
+  }),
   instrumentations: [getNodeAutoInstrumentations()],
-  ...(endpoint ? { traceExporter: new OTLPTraceExporter({ url: `${endpoint}/v1/traces` }) } : {}),
 });
 
 sdk.start();

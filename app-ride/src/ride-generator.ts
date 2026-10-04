@@ -1,5 +1,10 @@
 import { generateRideRequest, type RideRequest } from './ride-request.js';
 import type { RideRequestPublisher } from './ride-request-publisher.js';
+import { trace } from '@opentelemetry/api';
+import { createTraceAwareLogger } from './trace-context.js';
+
+const tracer = trace.getTracer('app-ride');
+const logger = createTraceAwareLogger(console);
 
 interface RideGeneratorOptions {
   intervalMs?: number;
@@ -26,11 +31,32 @@ export function startRideGenerator(
     }
 
     const rideRequest = createRide();
-    console.info('Generated ride request', rideRequest);
-
-    inFlightPublish = publisher.publish(rideRequest).catch(onError).finally(() => {
-      inFlightPublish = undefined;
-    });
+    inFlightPublish = tracer
+      .startActiveSpan(
+        'generate ride request',
+        {
+          attributes: {
+            'processing.step': 'generate-ride-request',
+            rideId: rideRequest.id,
+          },
+        },
+        async (span) => {
+          try {
+            logger.info('Generated ride request', {
+              ...rideRequest,
+              rideId: rideRequest.id,
+            });
+            await publisher.publish(rideRequest);
+          } catch (error) {
+            onError(error);
+          } finally {
+            span.end();
+          }
+        },
+      )
+      .finally(() => {
+        inFlightPublish = undefined;
+      });
   };
 
   const interval = setInterval(publishRide, intervalMs);

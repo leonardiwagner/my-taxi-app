@@ -4,6 +4,7 @@ import type { Transition } from '../../domain/transitions.js';
 import type { TripState } from '../../domain/trip.js';
 import type { InputCursor, TripWriter } from '../../application/ports.js';
 import type { TopicMap } from './topics.js';
+import { injectTraceHeaders } from '../../trace-context.js';
 
 export class TransactionalTripWriter implements TripWriter {
   constructor(
@@ -58,7 +59,7 @@ export class TransactionalTripWriter implements TripWriter {
     await this.inTransaction(async (transaction) => {
       await transaction.send({
         topic: this.topics.state,
-        messages: [{ key: rideId, value: null }],
+        messages: [{ key: rideId, value: null, headers: injectTraceHeaders() }],
       });
     });
   }
@@ -87,7 +88,13 @@ export class TransactionalTripWriter implements TripWriter {
   ): Promise<void> {
     await transaction.send({
       topic: this.topics.state,
-      messages: [{ key: state.rideId, value: JSON.stringify(state) }],
+      messages: [
+        {
+          key: state.rideId,
+          value: JSON.stringify(state),
+          headers: injectTraceHeaders(),
+        },
+      ],
     });
     if (event) {
       const topic =
@@ -96,7 +103,13 @@ export class TransactionalTripWriter implements TripWriter {
           : this.topics.rejected;
       await transaction.send({
         topic,
-        messages: [{ key: state.rideId, value: JSON.stringify(event) }],
+        messages: [
+          {
+            key: state.rideId,
+            value: JSON.stringify(event),
+            headers: injectTraceHeaders(),
+          },
+        ],
       });
     }
   }

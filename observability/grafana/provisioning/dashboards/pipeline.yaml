@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: Ride traces
+    orgId: 1
+    folder: Ride pipeline
+    type: file
+    disableDeletion: true
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards

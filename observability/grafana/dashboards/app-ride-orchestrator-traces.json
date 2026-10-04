@@ -1,0 +1,35 @@
+{
+  "id": null,
+  "uid": "app-ride-orchestrator-traces",
+  "title": "app-ride-orchestrator: latest traces",
+  "tags": ["rides", "tracing", "app-ride-orchestrator"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-24h", "to": "now" },
+  "templating": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "title": "100 latest traces from app-ride-orchestrator",
+      "description": "Most recent traces that include a span from app-ride-orchestrator.",
+      "type": "table",
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "gridPos": { "h": 24, "w": 24, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "traceql",
+          "query": "{ resource.service.name = \"app-ride-orchestrator\" }",
+          "limit": 100,
+          "tableType": "traces"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "sortBy": [{ "displayName": "startTime", "desc": true }]
+      }
+    }
+  ]
+}

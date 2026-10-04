@@ -16,9 +16,10 @@ topic. Configure these values with `KAFKA_BROKERS` (a comma-separated list) and
 Each message is JSON with a unique ride and customer identifier, a start and
 destination from a small list of city routes, and an ISO-8601 request timestamp.
 
-OpenTelemetry auto-instrumentation exports traces over OTLP/HTTP to
-`http://localhost:4318` by default. Set `OTEL_EXPORTER_OTLP_ENDPOINT` to use
-another collector endpoint.
+OpenTelemetry exports traces over OTLP/HTTP to Tempo at
+`http://localhost:4318` by default. Kafka headers carry the W3C trace context
+for the generated ride. Set `OTEL_EXPORTER_OTLP_ENDPOINT` to another OTLP/HTTP
+base URL (without `/v1/traces`) to use a different collector.
 
 ## Checks
 
