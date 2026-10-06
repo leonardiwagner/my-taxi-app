@@ -54,56 +54,48 @@ state machine.
 
 ## Prerequisites
 
-- Node.js >= 22 (developed against v22; `npm` 10+)
-- Docker with Compose v2
+- Docker with Compose v2 (required for both options)
+- Node.js >= 22 and `npm` 10+ (only when running services on your machine)
 
 ## Quick start
 
-### 1. Start the local infrastructure
+There are two ways to run the pipeline. Both start Kafka, Kafka UI, Tempo and
+Grafana from [docker-compose.yml](docker-compose.yml); they differ only in where
+the four services run.
+
+### Option A: everything in Docker Compose
 
 ```sh
-docker compose up -d
+docker compose up -d --build
 ```
 
-This starts single-broker KRaft Kafka on `localhost:9092`, Kafka UI on
-<http://localhost:8080>, Tempo on OTLP ports `4317`/`4318`, and Grafana on
-<http://localhost:3000>. Grafana's local login is `admin` / `admin`. Tempo stores
-traces in the `tempo-data` Compose volume and retains them for 24 hours.
-
-### 2. Create the topics
-
-Auto topic creation is disabled in every client, so the topics must exist before
-a service starts. Use the same partition count for all of them — records are
-keyed by `rideId`, and the orchestrator relies on per-key ordering.
+This builds one image per service, creates the topics with `kafka-init`, and
+starts `app-ride`, `app-pricing`, `app-match-driver` and
+`app-ride-orchestrator` once Kafka is healthy. Kafka UI is on
+<http://localhost:8080>, Grafana on <http://localhost:3000> (local login `admin` /
+`admin`). Tempo stores traces in the `tempo-data` Compose volume and retains them
+for 24 hours.
 
 ```sh
-for topic in rides pricing-results pricing-dead-letter \
-             driver-matching-results driver-matching-dead-letter \
-             ride.confirmed ride.rejected; do
-  docker compose exec -T kafka /opt/kafka/bin/kafka-topics.sh \
-    --bootstrap-server localhost:9092 \
-    --create --if-not-exists --topic "$topic" \
-    --partitions 1 --replication-factor 1
-done
-
-docker compose exec -T kafka /opt/kafka/bin/kafka-topics.sh \
-  --bootstrap-server localhost:9092 \
-  --create --if-not-exists --topic trip.state \
-  --partitions 1 --replication-factor 1 \
-  --config cleanup.policy=compact
+docker compose logs -f app-ride app-pricing app-match-driver app-ride-orchestrator
+docker compose up -d --build app-pricing   # rebuild and restart one service
+docker compose down                        # stop; add -v to delete the Tempo and Grafana volumes
 ```
 
-`trip.state` **must** be compacted: it is the orchestrator's durable state and
-is replayed from the beginning on every startup. Verify with:
+Keep `app-ride-orchestrator` at one replica (the default). Do not run a service
+on your machine at the same time as its Compose container: both join the same
+consumer group, so they split the work.
+
+### Option B: services on your machine
+
+Start the infrastructure in Docker:
 
 ```sh
-docker compose exec -T kafka /opt/kafka/bin/kafka-topics.sh \
-  --bootstrap-server localhost:9092 --describe --topic trip.state
+docker compose up -d kafka kafka-init kafka-ui tempo grafana
 ```
 
-### 3. Run the services
-
-In four terminals, one per service directory:
+Kafka is then on `localhost:9092`. Then run the services in four terminals, one
+per service directory:
 
 ```sh
 cd app-ride && npm install && npm run dev
@@ -118,12 +110,41 @@ freely — it replays `trip.state` before consuming results), and run only **one
 orchestrator instance: its trip state is in memory and coordinated through a
 single consumer group.
 
-### 4. Find a ride trace
+### Where the services connect
 
-Services export traces to local Tempo at `http://localhost:4318` by default.
-Each Kafka publish injects W3C `traceparent` headers and each consumer extracts
-them, so the spans for a ride share its trace ID. The `rideId` span attribute is
-also indexed for TraceQL search.
+| Setting                       | On your machine (default) | In Docker Compose        |
+| ----------------------------- | ------------------------- | ------------------------ |
+| `KAFKA_BROKERS`               | `localhost:9092`          | `kafka:29092`            |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://localhost:4318`   | `http://tempo:4318`      |
+
+Kafka advertises two listeners: `localhost:9092` for clients on the host and
+`kafka:29092` for clients on the Compose network. The Compose file sets the
+second column for each service; change the `environment` of a service there to
+point it elsewhere.
+
+### Topics
+
+`kafka-init` creates every topic on startup in both options, because auto
+creation is disabled in every client. Its commands are idempotent, so it is safe
+to run `docker compose up -d kafka-init` again. Use the same partition count for
+all topics — records are keyed by `rideId`, and the orchestrator relies on
+per-key ordering.
+
+`trip.state` **must** be compacted: it is the orchestrator's durable state and
+is replayed from the beginning on every startup. Verify with:
+
+```sh
+docker compose exec -T kafka /opt/kafka/bin/kafka-topics.sh \
+  --bootstrap-server localhost:9092 --describe --topic trip.state
+```
+
+### Find a ride trace
+
+Services export traces to Tempo: `http://localhost:4318` from your machine, and
+`http://tempo:4318` inside Compose (see the table above). Each Kafka publish
+injects W3C `traceparent` headers and each consumer extracts them, so the spans
+for a ride share its trace ID. The `rideId` span attribute is also indexed for
+TraceQL search.
 
 Ride processing logs include `trace_id` alongside `rideId`. Copy it from a log
 into Grafana's Tempo trace ID search to open the trace.
@@ -135,7 +156,7 @@ spans with their processing steps and durations.
 Set `OTEL_EXPORTER_OTLP_ENDPOINT` to another OTLP/HTTP base URL (without the
 `/v1/traces` suffix) to export elsewhere.
 
-### 5. Watch it work
+### Watch it work
 
 Tail the final events, or browse the topics in Kafka UI:
 
@@ -203,6 +224,10 @@ All commands run inside a service directory:
 | `npm run format:check` | Prettier check                                      |
 | `npm run clean`        | Remove `dist/` and `coverage/`                      |
 
+Each service has a multi-stage `Dockerfile` (build with dev dependencies, run
+with production dependencies only). `docker compose build <service>` builds one
+image.
+
 Conventions: TypeScript ESM with `.js` suffixes on relative imports, `strict`
 plus `noUncheckedIndexedAccess`, Prettier (single quotes, trailing commas), and
 collaborators injected through an options object with defaults so tests can
@@ -222,7 +247,13 @@ AI agents working in this repository should read [AGENTS.md](AGENTS.md).
 ## Troubleshooting
 
 - **`This server does not host this topic-partition` / startup failure** — a
-  topic is missing. Auto creation is off; create it as shown above.
+  topic is missing. Auto creation is off; run `docker compose up -d kafka-init`
+  (or check `docker compose logs kafka-init`).
+- **Compose services exit at startup** — they wait for Kafka and `kafka-init`
+  to finish. Check `docker compose ps -a` and `docker compose logs <service>`;
+  `kafka-init` is expected to show `Exited (0)`.
+- **A container cannot reach Kafka** — inside Compose use `kafka:29092`, not
+  `localhost:9092`; `localhost` is the container itself.
 - **Orchestrator never confirms anything** — check that `trip.state` is
   compacted and that only one orchestrator instance is running.
 - **Nothing arrives on the results topics** — the workers consume with

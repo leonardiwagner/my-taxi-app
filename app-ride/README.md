@@ -21,6 +21,22 @@ OpenTelemetry exports traces over OTLP/HTTP to Tempo at
 for the generated ride. Set `OTEL_EXPORTER_OTLP_ENDPOINT` to another OTLP/HTTP
 base URL (without `/v1/traces`) to use a different collector.
 
+## Run with Docker Compose
+
+From the repository root:
+
+```sh
+docker compose up -d --build app-ride
+docker compose logs -f app-ride
+```
+
+This also starts Kafka and runs `kafka-init`, which creates the topics before
+the service starts. The image is built from this directory's `Dockerfile`.
+Compose sets `KAFKA_BROKERS=kafka:29092` and
+`OTEL_EXPORTER_OTLP_ENDPOINT=http://tempo:4318`; every other variable in the
+configuration table uses its default unless you add it to this service's
+`environment` in `docker-compose.yml`.
+
 ## Checks
 
 ```sh

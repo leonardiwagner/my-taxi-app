@@ -4,7 +4,10 @@ import { createTraceAwareLogger } from './trace-context.js';
 import { startRideGenerator } from './ride-generator.js';
 import { createRideRequestPublisher } from './ride-request-publisher.js';
 
-const brokers = (process.env.KAFKA_BROKERS ?? 'localhost:9092').split(',');
+const brokers = (process.env.KAFKA_BROKERS ?? 'localhost:9092')
+  .split(',')
+  .map((broker) => broker.trim())
+  .filter(Boolean);
 const topic = process.env.KAFKA_RIDE_TOPIC ?? 'rides';
 const kafka = new Kafka({ clientId: 'app-ride', brokers, logLevel: logLevel.NOTHING });
 const logger = createTraceAwareLogger(console);

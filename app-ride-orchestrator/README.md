@@ -61,6 +61,25 @@ Final states are removed from memory and tombstoned from the compacted state top
 | `TRIP_FINAL_RETENTION_MS`     | `86400000`                | Time to keep final states before tombstoning           |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://localhost:4318`   | OTLP/HTTP collector base URL; `/v1/traces` is appended |
 
+## Run with Docker Compose
+
+From the repository root:
+
+```sh
+docker compose up -d --build app-ride-orchestrator
+docker compose logs -f app-ride-orchestrator
+```
+
+This also starts Kafka and runs `kafka-init`, which creates the topics before
+the service starts. The image is built from this directory's `Dockerfile`.
+Compose sets `KAFKA_BROKERS=kafka:29092` and
+`OTEL_EXPORTER_OTLP_ENDPOINT=http://tempo:4318`; every other variable in the
+configuration table uses its default unless you add it to this service's
+`environment` in `docker-compose.yml`.
+
+Run one container. Do not use `docker compose up --scale` for this service: the
+trip state is held in memory by each instance.
+
 ## Run
 
 ```sh
