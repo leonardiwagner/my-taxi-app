@@ -31,6 +31,38 @@ services:
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
     depends_on:
       - kafka
+  app-ride:
+    build: ./app-ride
+    environment:
+      KAFKA_BROKERS: kafka:29092
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
+    depends_on:
+      tempo:
+        condition: service_started
+  app-pricing:
+    build: ./app-pricing
+    environment:
+      KAFKA_BROKERS: kafka:29092
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
+    depends_on:
+      tempo:
+        condition: service_started
+  app-match-driver:
+    build: ./app-match-driver
+    environment:
+      KAFKA_BROKERS: kafka:29092
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
+    depends_on:
+      tempo:
+        condition: service_started
+  app-ride-orchestrator:
+    build: ./app-ride-orchestrator
+    environment:
+      KAFKA_BROKERS: kafka:29092
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
+    depends_on:
+      tempo:
+        condition: service_started
   tempo:
     image: grafana/tempo:2.8.1
     command: ["-config.file=/etc/tempo.yaml"]

@@ -31,6 +31,22 @@ into result and dead-letter records.
 
 If processing or publishing a result exhausts its retries, the original key and value plus failure details are published to the dead-letter topic. The input offset is committed only after publishing the result or dead-letter record succeeds. This provides at-least-once delivery, so consumers should tolerate duplicate outcomes after a crash between publish and offset commit.
 
+## Run with Docker Compose
+
+From the repository root:
+
+```sh
+docker compose up -d --build app-match-driver
+docker compose logs -f app-match-driver
+```
+
+This also starts Kafka and runs `kafka-init`, which creates the topics before
+the service starts. The image is built from this directory's `Dockerfile`.
+Compose sets `KAFKA_BROKERS=kafka:29092` and
+`OTEL_EXPORTER_OTLP_ENDPOINT=http://tempo:4318`; every other variable in the
+configuration table uses its default unless you add it to this service's
+`environment` in `docker-compose.yml`.
+
 ## Run
 
 ```sh
